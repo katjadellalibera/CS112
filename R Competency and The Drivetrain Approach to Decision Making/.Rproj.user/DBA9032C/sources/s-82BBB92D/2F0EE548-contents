@@ -1,0 +1,26 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+potential<- runif(200,max=200000,min=1000)
+cost<- runif(200,max=50000,min=0)
+income<- runif(200,max=200000,min=1000)
+days<- runif(200, max= 100, min= 7)
+mothers<- data.frame(potential,cost,income,days,off=days+potential/1000-cost/1000-income/20000+runif(200,max=10,min=0))
+mothers
+```
+```{r}
+write.csv(mothers,"C:\\Users\\rbc15\\Desktop\\Minerva\\second year\\Second Semester\\CS112\\mothers.csv")
+```
+
+```{r}
+library(ggplot2)
+ggplot(mothers,aes(x=cost,y=off))+ geom_point()
+ggplot(mothers,aes(x=potential,y=off))+ geom_point()
+ggplot(mothers,aes(x=income,y=off))+ geom_point()
+ggplot(mothers,aes(x=days,y=off))+ geom_point()
+hist(mothers$off)
+```
+

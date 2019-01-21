@@ -1,0 +1,6 @@
+"0","potential<- runif(200,max=200000,min=1000)"
+"0","cost<- runif(200,max=50000,min=0)"
+"0","income<- runif(200,max=200000,min=1000)"
+"0","days<- runif(200, max= 100, min= 7)"
+"0","mothers<- data.frame(potential,cost,income,days,off=days+potential/1000-cost/1000-income/20000+runif(200,max=10,min=0))"
+"0","mothers"
