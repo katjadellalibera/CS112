@@ -94,3 +94,14 @@ summary(non.PPTA$Rating)
 pie(non.PPTA.percentages,label=c(0,1,2,3))
 
 ## 4 ## 
+#selecting the bottom 25% and top 25% by RevisedAmount
+bottom.25<- new.mdid %>%
+  arrange(RevisedAmount)%>%
+  filter(row_number()/n()<=.25)
+top.25<- new.mdid %>%
+  arrange(desc(RevisedAmount))%>%
+  filter(row_number()/n()<=.25)
+#comparing the ratings of the two groups
+summary(bottom.25$Rating)
+summary(top.25$Rating)
+
