@@ -24,7 +24,6 @@ new.mdid <- mdid[-which.have.NAs, ]%>%
 
 ## 1 ##
 # a #
-
 new.mdid$original.duration= difftime(new.mdid$OriginalCompletionDate,
                                     new.mdid$ApprovalDate,
                                     unit = "weeks")
@@ -56,8 +55,10 @@ ggplot(new.mdid, aes(x=CirculationDate, y=as.numeric(original.duration)/52.14))+
 
 # b #
 #actual duration of the projects
-new.mdid$actual.duration=new.mdid$RevisedCompletionDate - new.mdid$ApprovalDate
-nafree.new.mdid<-new.mdid[-nas,]
+new.mdid$actual.duration=difftime(new.mdid$RevisedCompletionDate,
+                                  new.mdid$ApprovalDate,
+                                  unit="weeks")
+nafree.new.mdid<- new.mdid[-nas,]
 summary(as.numeric(nafree.new.mdid$actual.duration)/52.14)
 #histogram of the acutal durations
 hist(as.numeric(nafree.new.mdid$actual.duration)/52.14,
@@ -74,6 +75,13 @@ ggplot()+
   xlab("Circulation Date")+
   ylab("duration in years")+
   labs(color="type")
+
+#bonus: actual duration vs original duration
+fit2<- lm((as.numeric(actual.duration)/52.14) ~ I(as.numeric(original.duration)/52.14),data=new.mdid)
+ggplot(new.mdid, aes(x=as.numeric(original.duration)/52.14,y=as.numeric(actual.duration)/52.14))+
+  geom_point()+
+  xlab("original duration in years")+
+  ylab("actual duation in years")
 
 ## 2 ##
 # getting the rating percentages
@@ -104,4 +112,3 @@ top.25<- new.mdid %>%
 #comparing the ratings of the two groups
 summary(bottom.25$Rating)
 summary(top.25$Rating)
-
