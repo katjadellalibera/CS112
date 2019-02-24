@@ -1,15 +1,16 @@
 ## 1 ##
-# data generation
+# data generation and analysis
 # 999 datapoints:
 set.seed(1)
 data<- data.frame(variable1=runif(999,min=1,max=50))
-data$variable2<-50+data$variable1/10+runif(100,min=-2,max=2)
+data$variable2<-50+data$variable1/10+rnorm(100,min=-2,max=2)
 lm_data=lm(variable2~variable1,data=data)
 plot(data)
 abline(lm_data)
 # outlier:
 data_with_outlier<- rbind(data,c( variable1=150,variable2=-150))
 lm_data_with_outlier=lm(variable2~variable1, data=data_with_outlier)
+#plot with outlier
 plot(data_with_outlier)
 abline(lm_data_with_outlier,col="green")
 abline(lm_data,col="red")
@@ -29,7 +30,7 @@ library(haven)
 control_group <- lalonde%>%
   filter(treat==0)
 # making linear model
-lm_lalonde <- glm(re78~age+educ+re74+re75+I(educ*re74)+I(educ*re75)+
+lm_lalonde <- lm(re78~age+educ+re74+re75+I(educ*re74)+I(educ*re75)+
                     I(age*re74)+I(age*re75)+I(age*age)+I(re74*re75),data=control_group)
 summary(lm_lalonde)
 # simulating interval of expected values
@@ -211,7 +212,6 @@ for (age in 17:55){
 
 ## 3 ##
 library(datasets)
-library(boot)
 # disregard treatment 2 and add indicator
 plant_growth_filtered<- PlantGrowth%>%
   filter(group!="trt2")%>%
@@ -219,13 +219,42 @@ plant_growth_filtered<- PlantGrowth%>%
 # bootstrap the 95% confidence interval
 # auxiliary funtion
 boot_fn <- function(data,index) return(coef(lm(weight~indicator,
-                                               data=plant_growth_filtered),subset=index))
-boot_plant_growth<- boot(plant_growth_filtered,boot_fn,10000)
-conf_intervals <- apply(boot_plant_growth$t,2,quantile,c(0.025,0.975))
-  
+                                               data=plant_growth_filtered,subset=index)))
+n_b<-10000 # bootstrap repetitions
+n <- 20
+boot_plant_growth<- data.frame(intercept=c(rep(0,n_b)),indicator=c(rep(0,n_b)))
+for (b in 1:n_b){
+  i=sample(x=1:n,size=n,replace=TRUE)
+  boot_plant_growth[b,1] = boot_fn(plant_growth_filtered,i)[1]
+  boot_plant_growth[b,2] = boot_fn(plant_growth_filtered,i)[2] #store coefficients
+}
+conf_intervals_intercept <- quantile(boot_plant_growth$intercept,probs = c(0.025,0.5,0.975))
+conf_intervals_indicator <- quantile(boot_plant_growth$indicator,probs = c(0.025,0.5,0.975))  
+conf_intervals_indicator
+conf_intervals_intercept
+
+#not-bootstrapped confidence interval
+confint(lm(weight~indicator,data=plant_growth_filtered),level = 0.95)
+
+#histogram of boostrap results
+ggplot(boot_plant_growth,aes(x=intercept,fill="intercept"))+
+  geom_histogram()+
+  geom_histogram(data=boot_plant_growth,aes(x=indicator,fill="indicator"))+
+  labs(fill= "coefficient group",x="coefficient")
+
 ## 4 ##
 # R^2 function using the fact that it's correlation squared
-r_function<- function(Y,pred_y) cor(Y,pred_y)^2
+r_function <- function(Y,pred_y) cor(Y,pred_y)^2
+
+
+# test on plantgrowth
+lm_plant_growth<- lm(weight~indicator,data=plant_growth_filtered)
+plant_growth_filtered$expected_weight<- rep(lm_plant_growth$coefficients[1],20)+
+  rep(lm_plant_growth$coefficients[2],20)*plant_growth_filtered$indicator
+
+r_function(plant_growth_filtered$weight,plant_growth_filtered$expected_weight)
+#actual r^2 from linear model
+summary(lm_plant_growth)
 
 ## 5 ##
 # import data
@@ -257,25 +286,86 @@ treatment_probability <- function(coefs,person){
 }
 sim_glm <- sim(lm_nsw, 1000)
 storage_vector <- rep(0,1000)
-observation_vector <- rep(0,length(treatment_observations))
-control_observation_vector<- rep(0,length(control_observations))
+observation_vector <- rep(0,297)
+control_observation_vector<- rep(0,425)
 
 # getting probabilities for treatment group
-for (observation in 1:length(treatment_observations)){
+for (observation in 1:297){
   for (i in 1:1000){
     storage_vector[i]<-treatment_probability(sim_glm@coef[i,],treatment_observations[observation,])
   }
-  data.frame(observation_vector[observation]<-mean(as.numeric(storage_vector)))
+  observation_vector[observation]<-mean(as.numeric(storage_vector))
 }
 # getting probabilities for control group
-for (observation in 1:length(control_observations)){
+for (observation in 1:425){
   for (i in 1:1000){
     storage_vector[i]<-treatment_probability(sim_glm@coef[i,],control_observations[observation,])
   }
-  data.frame(control_observation_vector[observation]<-mean(as.numeric(storage_vector)))
+  control_observation_vector[observation]<-mean(as.numeric(storage_vector))
 }
+#making dataframe with entire dataset
+data_frame_treatment<-data.frame(probability=observation_vector,group=rep(1,length(observation_vector)))
+data_frame_control <- data.frame(probability=control_observation_vector,group=rep(0,length(control_observation_vector)))
+data_frame<- rbind(data_frame_treatment,data_frame_control)
+
+#plotting the histogram
+
+library(ggplot2)
+ggplot(data_frame,aes(x=probability,group=as.factor(group),fill=as.factor(group)))+
+  scale_fill_manual(values=c("lightblue","red"))+
+  geom_histogram()+
+  labs(fill= "treatment group")
+
+
+## alternate 5 withouth simulation ##
+library(foreign)
+nsw <- read.dta("nsw.dta")
+# predictor model
+nsw_control<-nsw%>%
+  filter(treat==0)
+nsw_treat<- nsw%>%
+  filter(treat==1)
+treatment_observations<-data.frame(age=nsw_treat$age,education=nsw_treat$education,black=nsw_treat$black,
+                                   hispanic=nsw_treat$hispanic,married=nsw_treat$married,nodegree=nsw_treat$nodegree,
+                                   re75=nsw_treat$re75)
+control_observations<-data.frame(age=nsw_control$age,education=nsw_control$education,black=nsw_control$black,
+                                 hispanic=nsw_control$hispanic,married=nsw_control$married,nodegree=nsw_control$nodegree,
+                                 re75=nsw_control$re75)
+
+lm_nsw <- glm(treat~age+education+black+hispanic+married+nodegree+re75,data=nsw)
+
+treatment_probability <- function(coefs,person){
+  logit <- coefs[1] + person[1]*coefs[2] +
+    person[2]*coefs[3] +
+    person[3]*coefs[4] + 
+    person[4]*coefs[5] +
+    person[5]*coefs[6] +
+    person[6]*coefs[7] +
+    person[7]*coefs[8]
+  return(logit)
+}
+observation_vector <- c(rep(0,297))
+control_observation_vector<- c(rep(0,425))
+
+# getting probabilities for treatment group
+for (observation in 1:297){
+  observation_vector[observation]<-as.numeric(treatment_probability(lm_nsw$coefficients,treatment_observations[observation,]))
+}
+# getting probabilities for control group
+for (observation in 1:425){
+  control_observation_vector[observation]<-as.numeric(treatment_probability(lm_nsw$coefficients,control_observations[observation,]))
+}
+
+#making dataframe with entire dataset
+data_frame_treatment <- data.frame(probability = observation_vector, treat = rep(1,length(observation_vector)))
+data_frame_control <- data.frame(probability=control_observation_vector,treat=rep(0,length(control_observation_vector)))
+data_frame<- rbind(data_frame_treatment,data_frame_control)
+
 
 #plotting the histogram
 library(ggplot2)
-ggplot(data=observation_vector, aes(ovservation_vector))+
-  geom_histogram()
+ggplot(data_frame,aes(x=probability,group=as.factor(treat),fill=as.factor(treat)))+
+  scale_fill_manual(values=c("lightblue","red"))+
+  geom_histogram()+
+  labs(fill= "treatment group")
+

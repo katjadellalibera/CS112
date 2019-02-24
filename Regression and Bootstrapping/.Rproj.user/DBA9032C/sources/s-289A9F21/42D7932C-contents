@@ -1,0 +1,51 @@
+library(foreign)
+nsw <- read.dta("nsw.dta")
+# predictor model
+nsw_control<-nsw%>%
+  filter(treat==0)
+nsw_treat<- nsw%>%
+  filter(treat==1)
+treatment_observations<-data.frame(age=nsw_treat$age,education=nsw_treat$education,black=nsw_treat$black,
+                                   hispanic=nsw_treat$hispanic,married=nsw_treat$married,nodegree=nsw_treat$nodegree,
+                                   re75=nsw_treat$re75)
+control_observations<-data.frame(age=nsw_control$age,education=nsw_control$education,black=nsw_control$black,
+                                 hispanic=nsw_control$hispanic,married=nsw_control$married,nodegree=nsw_control$nodegree,
+                                 re75=nsw_control$re75)
+
+lm_nsw <- glm(treat~age+education+black+hispanic+married+nodegree+re75,data=nsw)
+
+treatment_probability <- function(coefs,person){
+  logit <- coefs[1] + person[1]*coefs[2] +
+    person[2]*coefs[3] +
+    person[3]*coefs[4] + 
+    person[4]*coefs[5] +
+    person[5]*coefs[6] +
+    person[6]*coefs[7] +
+    person[7]*coefs[8]
+  return(exp(logit) /(1+ exp(logit)))
+}
+observation_vector <- c(rep(0,297))
+control_observation_vector<- c(rep(0,425))
+
+# getting probabilities for treatment group
+for (observation in 1:297){
+  observation_vector[observation]<-as.numeric(treatment_probability(lm_nsw$coefficients,treatment_observations[observation,]))
+}
+# getting probabilities for control group
+for (observation in 1:425){
+  control_observation_vector[observation]<-as.numeric(treatment_probability(lm_nsw$coefficients,control_observations[observation,]))
+}
+
+#making dataframe with entire dataset
+data_frame_treatment <- data.frame(probability = observation_vector, treat = rep(1,length(observation_vector)))
+data_frame_control <- data.frame(probability=control_observation_vector,treat=rep(0,length(control_observation_vector)))
+data_frame<- rbind(data_frame_treatment,data_frame_control)
+
+
+#plotting the histogram
+
+library(ggplot2)
+ggplot(data_frame,aes(x=probability,group=as.factor(treat),fill=as.factor(treat)))+
+  scale_fill_manual(values=c("lightblue","red"))+
+  geom_histogram()+
+  labs(fill= "treatment group")
