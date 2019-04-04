@@ -1,73 +1,98 @@
 ### 1 ###
 ## a ##
-
 library(Matching)
 data("lalonde")
 attach(lalonde)
 
+X<- cbind(age,educ,black, hisp, married, nodegr, u74, u75, re75, re74)
 genout <- GenMatch(Tr=treat, X=X)
-
+mout<- Match(Y=re78,Tr=treat,X=X, Weight.matrix = genout)
 summary(mout)
-
 mb <- MatchBalance(treat~age +educ+black+ hisp+ married+ nodegr+ u74+ u75+
-                     re75+ re74+ I(re74*re75) + re78,
-                   match.out=genout, nboots=500)
+                     re75+ re74+ I(re74*re75),
+                   match.out=mout, nboots=500)
 
 ## b ## 
-
-genout <- GenMatch(Tr=treat, X=X, BalanceMatrix=BalanceMat, estimand="ATT", exact = TRUE, M=1,
+genout <- GenMatch(Tr=treat, X=X, BalanceMatrix=BalanceMat, estimand="ATT", M=1,
                    pop.size=16, max.generations=10, wait.generations=1)
-
 #The outcome variable
 Y=re78/1000
-
-#
 # Now that GenMatch() has found the optimal weights, let's estimate
 # our causal effect of interest using those weights
-#
 mout <- Match(Y=Y, Tr=treat, X=X, Weight.matrix=genout)
 summary(mout)
-
-#                        
 #Let's determine if balance has actually been obtained on the variables of interest
-#                        
 mb <- MatchBalance(treat~age +educ+black+ hisp+ married+ nodegr+ u74+ u75+
                      re75+ re74+ I(re74*re75),
                    match.out=mout, nboots=500)
 
 ## c ##
 genout <- GenMatch(Tr=treat, X=X, BalanceMatrix=BalanceMat)
-
 #The outcome variable
 Y=re78/1000
-
-#
 # Now that GenMatch() has found the optimal weights, let's estimate
 # our causal effect of interest using those weights
-#
 mout <- Match(Y=Y, Tr=treat, X=X, Weight.matrix=genout)
 summary(mout)
-
-#                        
 #Let's determine if balance has actually been obtained on the variables of interest
-#                        
-mb <- MatchBalance(re78~age +educ+black+ hisp+ married+ nodegr+ u74+ u75+
+mb <- MatchBalance(treat~age +educ+black+ hisp+ married+ nodegr+ u74+ u75+
                      re75+ re74+ I(re74*re75),
                    match.out=mout, nboots=500)
+
+
 ### 2 ###
 ## Breakout instruction notes ##
 foo <- read.csv("https://course-resources.minerva.kgi.edu/uploaded_files/mke/00086677-3767/peace.csv")
-
 # extract relevant columns
 foo <- foo[, c(6:8, 11:16, 99, 50, 114, 49, 63, 136, 109, 126, 48, 160, 142, 10)]
-
 # remove 2 rows with missing data (there are better ways to handle missing data)
 foo <- foo[c(-19, -47), ]
-
 # check that all missing data is gone...
 which(is.na(foo) == TRUE)
-
 # take a peek at the data set (identify the columns)
 head(foo)
-
+## new code ##
+# the logistic regression model without interaction terms:
+glm1 <- glm(pbs2s3~ wartype + logcost + wardur + factnum + factnum2 + trnsfcap + 
+              exp + decade + treaty + untype4,
+            data = foo,
+            family = "binomial")
+# the logistic regression model with interaction term from paper
+glm2 <- glm(pbs2s3~ wartype + logcost + wardur + factnum + factnum2 + trnsfcap + 
+              exp + decade + treaty + untype4 + wardur*untype4 ,
+            data = foo,
+            family = "binomial")
+# the logistic regression model with new interaction term
+glm3 <- glm(pbs2s3~ wartype + logcost + wardur + factnum + factnum2 + trnsfcap + 
+              exp + decade + treaty + untype4 + logdead*untype4,
+            data = foo,
+            family = "binomial")
+## getting the marginal effect
+# creating a treated and control group where all the variables are average except
+# duration wich goes up to 315 as in the paper.
+treated1<- data.frame("wartype" = rep(mean(foo$wartype),315), 
+                     "logcost" = rep(mean(foo$logcost),315),
+                     "wardur" = c(1:315), #1 through 315
+                     "factnum" = rep(mean(foo$factnum),315),
+                     "factnum2" = rep(mean(foo$factnum),315),
+                     "trnsfcap" = rep(mean(foo$trnsfcap),315),
+                     "develop" = rep(mean(foo$develop),315),
+                     "exp" = rep(mean(foo$exp),315),
+                     "decade" = rep(mean(foo$decade),315),
+                     "treaty" = rep(mean(foo$treaty),315),
+                     "untype4" = rep(1,315)) # this is the treatment group
+control1<- data.frame("wartype" = rep(mean(foo$wartype),315), 
+                     "logcost" = rep(mean(foo$logcost),315),
+                     "wardur" = c(1:315), #1 through 315
+                     "factnum" = rep(mean(foo$factnum),315),
+                     "factnum2" = rep(mean(foo$factnum),315),
+                     "trnsfcap" = rep(mean(foo$trnsfcap),315),
+                     "develop" = rep(mean(foo$develop),315),
+                     "exp" = rep(mean(foo$exp),315),
+                     "decade" = rep(mean(foo$decade),315),
+                     "treaty" = rep(mean(foo$treaty),315),
+                     "untype4" = rep(0,315)) # this is the control group
+marginaleffect1<- predict(glm1, newdata = treated1, lty = 3, type = "response") - predict(glm1, newdata = control1, type = "response")
+# plotting the original model
+plot(c(1:315), marginaleffect1, type = "l", ylim = c(0,1),xlim = c(0,315))
 
