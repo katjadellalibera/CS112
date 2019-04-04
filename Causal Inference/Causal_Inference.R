@@ -54,5 +54,20 @@ summary(mout)
 mb <- MatchBalance(re78~age +educ+black+ hisp+ married+ nodegr+ u74+ u75+
                      re75+ re74+ I(re74*re75),
                    match.out=mout, nboots=500)
+### 2 ###
+## Breakout instruction notes ##
+foo <- read.csv("https://course-resources.minerva.kgi.edu/uploaded_files/mke/00086677-3767/peace.csv")
+
+# extract relevant columns
+foo <- foo[, c(6:8, 11:16, 99, 50, 114, 49, 63, 136, 109, 126, 48, 160, 142, 10)]
+
+# remove 2 rows with missing data (there are better ways to handle missing data)
+foo <- foo[c(-19, -47), ]
+
+# check that all missing data is gone...
+which(is.na(foo) == TRUE)
+
+# take a peek at the data set (identify the columns)
+head(foo)
 
 
