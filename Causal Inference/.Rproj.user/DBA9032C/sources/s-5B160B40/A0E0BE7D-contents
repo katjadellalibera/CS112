@@ -43,8 +43,8 @@ mb <- MatchBalance(treat~age +educ+black+ hisp+ married+ nodegr+ u74+ u75+
 ### 2 ###
 ## Breakout instruction notes ##
 foo <- read.csv("https://course-resources.minerva.kgi.edu/uploaded_files/mke/00086677-3767/peace.csv")
-# extract relevant columns
-foo <- foo[, c(6:8, 11:16, 99, 50, 114, 49, 63, 136, 109, 126, 48, 160, 142, 10)]
+# extract relevant columns (adding 108 for logdead)
+foo <- foo[, c(6:8, 11:16, 99, 50, 114, 49, 63, 136, 108, 109, 126, 48, 160, 142, 10)]
 # remove 2 rows with missing data (there are better ways to handle missing data)
 foo <- foo[c(-19, -47), ]
 # check that all missing data is gone...
@@ -70,29 +70,51 @@ glm3 <- glm(pbs2s3~ wartype + logcost + wardur + factnum + factnum2 + trnsfcap +
 ## getting the marginal effect
 # creating a treated and control group where all the variables are average except
 # duration wich goes up to 315 as in the paper.
-treated1<- data.frame("wartype" = rep(mean(foo$wartype),315), 
-                     "logcost" = rep(mean(foo$logcost),315),
-                     "wardur" = c(1:315), #1 through 315
-                     "factnum" = rep(mean(foo$factnum),315),
-                     "factnum2" = rep(mean(foo$factnum),315),
-                     "trnsfcap" = rep(mean(foo$trnsfcap),315),
-                     "develop" = rep(mean(foo$develop),315),
-                     "exp" = rep(mean(foo$exp),315),
-                     "decade" = rep(mean(foo$decade),315),
-                     "treaty" = rep(mean(foo$treaty),315),
-                     "untype4" = rep(1,315)) # this is the treatment group
-control1<- data.frame("wartype" = rep(mean(foo$wartype),315), 
-                     "logcost" = rep(mean(foo$logcost),315),
-                     "wardur" = c(1:315), #1 through 315
-                     "factnum" = rep(mean(foo$factnum),315),
-                     "factnum2" = rep(mean(foo$factnum),315),
-                     "trnsfcap" = rep(mean(foo$trnsfcap),315),
-                     "develop" = rep(mean(foo$develop),315),
-                     "exp" = rep(mean(foo$exp),315),
-                     "decade" = rep(mean(foo$decade),315),
-                     "treaty" = rep(mean(foo$treaty),315),
-                     "untype4" = rep(0,315)) # this is the control group
-marginaleffect1<- predict(glm1, newdata = treated1, lty = 3, type = "response") - predict(glm1, newdata = control1, type = "response")
-# plotting the original model
-plot(c(1:315), marginaleffect1, type = "l", ylim = c(0,1),xlim = c(0,315))
+treated1 <- data.frame("wartype" = rep(mean(foo$wartype),315), 
+                      "logcost" = rep(mean(foo$logcost),315),
+                      "wardur" = c(1:315), #1 through 315
+                      "factnum" = rep(mean(foo$factnum),315),
+                      "factnum2" = rep(mean(foo$factnum),315),
+                      "trnsfcap" = rep(mean(foo$trnsfcap),315),
+                      "develop" = rep(mean(foo$develop),315),
+                      "exp" = rep(mean(foo$exp),315),
+                      "decade" = rep(mean(foo$decade),315),
+                      "treaty" = rep(mean(foo$treaty),315),
+                      "untype4" = rep(1,315)) # this is the treatment group
+control1 <- data.frame("wartype" = rep(mean(foo$wartype),315), 
+                      "logcost" = rep(mean(foo$logcost),315),
+                      "wardur" = c(1:315), #1 through 315
+                      "factnum" = rep(mean(foo$factnum),315),
+                      "factnum2" = rep(mean(foo$factnum),315),
+                      "trnsfcap" = rep(mean(foo$trnsfcap),315),
+                      "develop" = rep(mean(foo$develop),315),
+                      "exp" = rep(mean(foo$exp),315),
+                      "decade" = rep(mean(foo$decade),315),
+                      "treaty" = rep(mean(foo$treaty),315),
+                      "untype4" = rep(0,315)) # this is the control group
+#adding interaction terms
+treated2 <- cbind(treated1, "wardur*untype4" = treated1$wardur*treated1$untype4)
+control2 <- cbind(control1, "wardur*untype4" = treated1$wardur*treated1$untype4)
+treated3 <- cbind(treated1, "logdead*untype4" = rep(mean(foo$logdead),315)*treated1$untype4)
+treated3 <- cbind(control1, "logdead*untype4" = rep(mean(foo$logdead),315)*treated1$untype4)
+# calculating marginal effects
+marginaleffect1 <- predict(glm1, newdata = treated1, type = "response") - predict(glm1, newdata = control1, type = "response")
+marginaleffect2 <- predict(glm2, newdata = treated2, type = "response") - predict(glm2, newdata = control2, type = "response")
+marginaleffect3 <- predict(glm3, newdata = treated3, type = "response") - predict(glm3, newdata = control3, type = "response")
+# plotting the original model and model with interaction term from the paper
+plot(c(1:315), marginaleffect1, type = "l", ylim = c(0,0.8),xlim = c(0,315),lty = 3,
+     xlab = "Duration of wars in months", ylab = "Marginal effects of UN peacekeeping operations")
+lines(c(1:315), marginaleffect2, ylim = c(0,1), xlim = c(0,315))
+text(100,0.2,"Model with interaction term")
+text(225,0.47,"Dotted: Original model")
+# plotting the original model and model with new interaction term
+plot(c(1:315), marginaleffect1, type = "l", ylim = c(0,0.8),xlim = c(0,315),lty = 3,
+     xlab = "Duration of wars in months", ylab = "Marginal effects of UN peacekeeping operations")
+lines(c(1:315), marginaleffect3, ylim = c(0,1), xlim = c(0,315))
+text(100,0.2,"Model with new interaction term")
+text(225,0.47,"Dotted: Original model")
 
+
+### 3 ###
+Tr <- rep(0, length(foo$uncint))
+Tr[which(foo$uncint != 0 & foo$uncint != 1)] <- 1
