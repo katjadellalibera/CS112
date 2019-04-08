@@ -232,21 +232,21 @@ fit1 <- glm(treat ~  wartype + logcost + wardur + factnum + factnum2 + trnsfcap 
               I(wartype^2) + I(logcost^2) + I(wardur^2) + I(wardur*untype4) + I(factnum*wardur),
             family = binomial,
             data = foo)
-mout1 <- Match(X = fit1$fitted, Tr = foo$treat)
+mout1 <- Match(Y = foo$pbs2l, X = fit1$fitted, Tr = foo$treat)
 mb2l.2 <- MatchBalance(treat ~  wartype + logcost + wardur + factnum + factnum2 + trnsfcap  + exp + decade + untype4 +
                          I(wartype^2) + I(logcost^2) + I(wardur^2) + I(wardur*untype4) + I(factnum*wardur),
                        match.out = mout1,
                        data = foo,
                        nboots = 500)
-summary(Match(Y = foo$pbs2l, X = fit1$fitted, Tr = foo$treat))
+summary(mout1)
 # bias adjusted:
-mout1 <- Match(X = fit1$fitted, Tr = foo$treat)
-mb2l.2 <- MatchBalance(treat ~  wartype + logcost + wardur + factnum + factnum2 + trnsfcap  + exp + decade + untype4 +
+mout1ba <- Match(Y = foo$pbs2l, X = fit1$fitted, Tr = foo$treat, BiasAdjust = TRUE)
+mb2l.2ba <- MatchBalance(treat ~  wartype + logcost + wardur + factnum + factnum2 + trnsfcap  + exp + decade + untype4 +
                          I(wartype^2) + I(logcost^2) + I(wardur^2) + I(wardur*untype4) + I(factnum*wardur),
-                       match.out = mout1,
+                       match.out = mout1ba,
                        data = foo,
                        nboots = 500)
-summary(Match(Y = foo$pbs2l, X = fit1$fitted, Tr = foo$treat))
+summary(mout1ba)
 
 
 # 5 years lenient peace building success
@@ -254,13 +254,21 @@ fit2 <- glm(treat ~  wartype + logcost + wardur + factnum + factnum2 + trnsfcap 
               I(wartype^2) + I(logcost^2) + I(wardur^2) + I(wardur*untype4) + I(factnum*wardur),
             family = binomial,
             data = foo)
-mout2 <- Match(Tr = foo$treat, X = fit2$fitted)
+mout2 <- Match(Y = foo$pbs5l, Tr = foo$treat, X = fit2$fitted)
 mb5l.2 <- MatchBalance(treat ~  wartype + logcost + wardur + factnum + factnum2 + trnsfcap + exp + decade + untype4 +
                          I(wartype^2) + I(logcost^2) + I(wardur^2) + I(wardur*untype4) + I(factnum*wardur),
                        match.out = mout2,
                        data = foo,
                        nboots = 500)
-summary(Match(Y = foo$pbs2l, X = fit2$fitted, Tr = foo$treat))
+summary(mout2)
+# bias-adjusted:
+mout2ba <- Match(Y = foo$pbs5l, Tr = foo$treat, X = fit2$fitted)
+mb5l.2ba <- MatchBalance(treat ~  wartype + logcost + wardur + factnum + factnum2 + trnsfcap + exp + decade + untype4 +
+                         I(wartype^2) + I(logcost^2) + I(wardur^2) + I(wardur*untype4) + I(factnum*wardur),
+                       match.out = mout2ba,
+                       data = foo,
+                       nboots = 500)
+summary(mout2ba)
 
 
 ## genetic matching: ##
@@ -274,6 +282,12 @@ summary(mout2l)
 mb2l.4 <- MatchBalance(treat ~  wartype + logcost + wardur + factnum + factnum2 + trnsfcap + exp + decade,
                        match.out = mout2l,
                        data = foo)
+# bias-adjusted: 
+mout2lba <- Match(Y = Y2, Tr = foo$treat, X = X2, Weight.matrix = genout2l, BiasAdjust = TRUE)
+summary(mout2lba)
+mb2l.4ba <- MatchBalance(treat ~  wartype + logcost + wardur + factnum + factnum2 + trnsfcap + exp + decade,
+                       match.out = mout2lba,
+                       data = foo)
 
 # 5 years lenient peacebuilding success
 X5 <- cbind(foo$wartype, foo$logcost, foo$wardur, foo$factnum, foo$factnum2, foo$trnsfcap, foo$exp, foo$decade)
@@ -284,3 +298,10 @@ summary(mout5l)
 mb2l.4 <- MatchBalance(treat ~  wartype + logcost + wardur + factnum + factnum2 + trnsfcap + exp + decade,
                        match.out = mout5l,
                        data = foo)
+# bias-adjusted:
+mout5lba <- Match(Y = Y5, Tr = foo$treat, X = X5, Weight.matrix = genout5l, BiasAdjust = TRUE)
+summary(mout5lba)
+mb2l.4ba <- MatchBalance(treat ~  wartype + logcost + wardur + factnum + factnum2 + trnsfcap + exp + decade,
+                       match.out = mout5lba,
+                       data = foo)
+
