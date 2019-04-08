@@ -212,6 +212,7 @@ mb2l.1 <- MatchBalance(treat ~ wartype + logcost + wardur + factnum + factnum2 +
                          exp + decade + treaty + untype4 ,
                        data = foo,
                        nboots = 500)
+effect2l
 
 
 # lenient peace building success after 5 years:
@@ -224,6 +225,7 @@ mb5l.1 <- MatchBalance(treat ~ wartype + logcost + wardur + factnum + factnum2 +
                          exp + decade + treaty + untype4,
                        data = foo,
                        nboots = 500)
+effect5l
 
 ## p-score matching: ##
 # 2 years lenient peace building success 
@@ -238,15 +240,10 @@ mb2l.2 <- MatchBalance(treat ~  wartype + logcost + wardur + factnum + factnum2 
                        match.out = mout1,
                        data = foo,
                        nboots = 500)
-summary(mout1)
+summary(mout1) # no statistically significant result
 # bias adjusted:
 mout1ba <- Match(Y = foo$pbs2l, X = fit1$fitted, Tr = foo$treat, BiasAdjust = TRUE)
-mb2l.2ba <- MatchBalance(treat ~  wartype + logcost + wardur + factnum + factnum2 + trnsfcap  + exp + decade + untype4 +
-                         I(wartype^2) + I(logcost^2) + I(wardur^2) + I(wardur*untype4) + I(factnum*wardur),
-                       match.out = mout1ba,
-                       data = foo,
-                       nboots = 500)
-summary(mout1ba)
+summary(mout1ba) # no statistically significant result
 
 
 # 5 years lenient peace building success
@@ -262,46 +259,36 @@ mb5l.2 <- MatchBalance(treat ~  wartype + logcost + wardur + factnum + factnum2 
                        nboots = 500)
 summary(mout2)
 # bias-adjusted:
-mout2ba <- Match(Y = foo$pbs5l, Tr = foo$treat, X = fit2$fitted)
-mb5l.2ba <- MatchBalance(treat ~  wartype + logcost + wardur + factnum + factnum2 + trnsfcap + exp + decade + untype4 +
-                         I(wartype^2) + I(logcost^2) + I(wardur^2) + I(wardur*untype4) + I(factnum*wardur),
-                       match.out = mout2ba,
-                       data = foo,
-                       nboots = 500)
+mout2ba <- Match(Y = foo$pbs5l, Tr = foo$treat, X = fit2$fitted, BiasAdjust = TRUE)
 summary(mout2ba)
 
 
 ## genetic matching: ##
 library(rgenoud)
+set.seed(234)
 # 2 years lenient peacebuilding success
 X2 <- cbind(foo$wartype, foo$logcost, foo$wardur, foo$factnum, foo$factnum2, foo$trnsfcap, foo$exp, foo$decade)
 Y2 <- foo$pbs2l
-genout2l <- GenMatch(Tr = foo$treat, X = X2, pop.size = 300, max.generations = 30, wait.generations = 1)
+genout2l <- GenMatch(Tr = foo$treat, X = X2, pop.size = 300, max.generations = 30, wait.generations = 2)
 mout2l <- Match(Y = Y2, Tr = foo$treat, X = X2, Weight.matrix = genout2l)
-summary(mout2l)
 mb2l.4 <- MatchBalance(treat ~  wartype + logcost + wardur + factnum + factnum2 + trnsfcap + exp + decade,
                        match.out = mout2l,
                        data = foo)
+summary(mout2l)
 # bias-adjusted: 
 mout2lba <- Match(Y = Y2, Tr = foo$treat, X = X2, Weight.matrix = genout2l, BiasAdjust = TRUE)
 summary(mout2lba)
-mb2l.4ba <- MatchBalance(treat ~  wartype + logcost + wardur + factnum + factnum2 + trnsfcap + exp + decade,
-                       match.out = mout2lba,
-                       data = foo)
 
 # 5 years lenient peacebuilding success
+set.seed(345)
 X5 <- cbind(foo$wartype, foo$logcost, foo$wardur, foo$factnum, foo$factnum2, foo$trnsfcap, foo$exp, foo$decade)
 Y5 <- foo$pbs5l
-genout5l <- GenMatch(Tr = foo$treat, X = X5, pop.size = 300, max.generations = 30, wait.generations = 1)
+genout5l <- GenMatch(Tr = foo$treat, X = X5, pop.size = 300, max.generations = 30, wait.generations = 2)
 mout5l <- Match(Y = Y5, Tr = foo$treat, X = X5, Weight.matrix = genout5l)
-summary(mout5l)
 mb2l.4 <- MatchBalance(treat ~  wartype + logcost + wardur + factnum + factnum2 + trnsfcap + exp + decade,
                        match.out = mout5l,
                        data = foo)
+summary(mout5l)
 # bias-adjusted:
 mout5lba <- Match(Y = Y5, Tr = foo$treat, X = X5, Weight.matrix = genout5l, BiasAdjust = TRUE)
 summary(mout5lba)
-mb2l.4ba <- MatchBalance(treat ~  wartype + logcost + wardur + factnum + factnum2 + trnsfcap + exp + decade,
-                       match.out = mout5lba,
-                       data = foo)
-
