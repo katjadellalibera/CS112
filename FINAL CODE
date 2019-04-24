@@ -1,0 +1,168 @@
+library(MatchIt)
+library(Zelig)
+library(rbounds)
+library(Matching) #add new #for GenMatch
+library(rgenoud) #add new #for GenMatch
+#Data downloadable from here
+# https://drive.google.com/open?id=1GSWhGIWiAOfFZWt-kVU4nLkMVaCRDbeu
+
+load("~/Downloads/datamatch.Rdata")
+
+outcomes <- datamatch[10:18]
+
+outcomes.lbls <- names(outcomes) #create a name matrix to use later 
+
+n.outcomes <- dim(outcomes)[2] #dimension is 1502 rows, 9 columns
+#so we choose 9 columns
+
+datamatch[, 10:18][is.na(datamatch[, 10:18]) == "TRUE"] <- 99999
+#if any rows in this sub-table has missing data then change to 99999
+datamatch <- na.omit(datamatch)
+
+datamatch[datamatch == 99999] <- NA
+
+#PRE-MATCHING TABLE
+outcomes.pre <- datamatch[10:18] 
+
+tab3.pre <- matrix(NA, nrow = n.outcomes, ncol = 5)
+rownames(tab3.pre) <- outcomes.lbls
+colnames(tab3.pre) <- c("N", "prop.ev", "prop.tv", "diff", "pvalue")
+
+for (i in 1:n.outcomes) {
+  tab3.pre[i, 1] <- length(na.omit(outcomes.pre[, i]))
+  tab3.pre[i, 2:3] <- rev(prop.table(table(outcomes.pre[,i],datamatch$EV),2)[2,])*100
+  tab3.pre[i, 4] <- tab3.pre[i, 2] - tab3.pre[i, 3]	
+  tab3.pre[i, 5] <- prop.test(table(outcomes.pre[, i], datamatch$EV)[2, ], n = apply(table(outcomes.pre[, i], datamatch$EV), 2, sum))$p.value
+}
+#For any rows in the table
+#Column 1 will be total number of observations
+#Column 2 to 3 will be % of people who choose E-voting and % who choose Traditional voting
+#Column 4 will be (Evoting - Traditional voting)
+#Column 5 will be the p-value
+
+datamatch[, 10:18][is.na(datamatch[, 10:18]) == "TRUE"] <- 99999
+
+#PROPENSITY MATCHING WITH MATCHIT
+print("Matching")
+
+set.seed(36466)
+
+m.out <- matchit(EV ~ age.group + I(age.group^2) + I(age.group^3) + age.group:educ + age.group:tech + educ + I(educ^2) + tech + I(tech^2) + pol.info + educ:pol.info + age.group:pol.info + tech:pol.info + white.collar + not.full.time + male, caliper = 0.05, data = datamatch, method = "nearest", verbose = "TRUE")
+
+#save(m.out, file = "m.out.Rdata")
+
+print("Balance Improvement")
+print(summary(m.out))
+
+#pdf("balance.pdf")
+
+plot(m.out)
+plot(m.out, type = "hist")
+plot(m.out, type = "jitter")
+
+#dev.off()
+
+# matched sample
+
+datamatched <- match.data(m.out)
+datamatched[datamatched == 99999] <- NA #dont run this before table 3, but run before table 4
+
+#save(datamatched, file = "datamatched.Rdata") #dont need this
+
+outcomes.post <- datamatched[10:18]
+
+tab3.post <- matrix(NA, nrow = n.outcomes, ncol = 5)
+rownames(tab3.post) <- outcomes.lbls
+colnames(tab3.post) <- c("N", "prop.ev", "prop.tv", "diff", "pvalue")
+
+for (i in 1:n.outcomes) {
+  tab3.post[i, 1] <- length(na.omit(outcomes.post[, i]))
+  tab3.post[i, 2:3] <- rev(prop.table(table(outcomes.post[, i], datamatched$EV), 2)[2, ]) * 100
+  tab3.post[i, 4] <- tab3.post[i, 2] - tab3.post[i, 3]	
+  tab3.post[i, 5] <- prop.test(table(outcomes.post[, i], datamatched$EV)[2, ], n = apply(table(outcomes.post[, i], datamatched$EV), 2, sum))$p.value
+}
+
+tab3 <- cbind(tab3.pre, tab3.post)
+
+tab3 <- tab3[rev(order(tab3[, 9])), ]
+
+### Table 3 ###
+
+print(tab3, digits = 4)
+
+################## REPLICATION: GENETIC MATCHING #####################################################
+print("Matching")
+set.seed(36466)
+X = cbind(datamatch$age.group, datamatch$age.group * datamatch$age.group, 
+          datamatch$age.group * datamatch$age.group * datamatch$age.group,
+          datamatch$age.group/datamatch$educ, datamatch$age.group/datamatch$tech, 
+          datamatch$educ, datamatch$educ * datamatch$educ, datamatch$tech,
+          datamatch$tech * datamatch$tech, datamatch$pol.info,
+          datamatch$educ / datamatch$pol.info, datamatch$age.group / datamatch$pol.info, 
+          datamatch$tech / datamatch$pol.info, datamatch$white.collar,
+          datamatch$not.full.time)
+Tr = datamatch$EV
+Y1 = datamatch$capable.auth #Qualification of poll workers
+Y2 = datamatch$eval.voting #Evaluation of voting experience
+Y3 = datamatch$easy.voting #Ease of voting procedure
+Y4 = datamatch$sure.counted #Sure vote was counted
+Y5 = datamatch$conf.secret #Confident ballot secret
+Y6 = datamatch$how.clean #Election in Salta are clean
+Y7 = datamatch$speed #Speed of voting process
+Y8 = datamatch$agree.evoting #Agree substitute TV by EV
+Y9 = datamatch$select.cand #Select candidates electronically
+
+genout <- GenMatch(Tr = Tr, X = X, estimand = "ATT", M = 1, caliper = 0.05,
+                   pop.size = 30, max.generations = 10, wait.generations = 1)
+rr <- Match(Tr=Tr, X=X, estimand = "ATT", M = 1, caliper = 0.05, Weight.matrix = genout)
+summary(rr)
+mb <- MatchBalance(datamatch$EV ~ datamatch$age.group + I(datamatch$age.group^2) + I(datamatch$age.group^3) + 
+                     datamatch$age.group:datamatch$educ + datamatch$age.group:datamatch$tech + 
+                     datamatch$educ + I(datamatch$educ^2) + datamatch$tech + I(datamatch$tech^2) + 
+                     datamatch$pol.info + datamatch$educ:datamatch$pol.info + datamatch$age.group:datamatch$pol.info + 
+                     datamatch$tech:datamatch$pol.info + datamatch$white.collar + datamatch$not.full.time + 
+                     datamatch$male, match.out = rr, nboots = 500)
+#BALANCE IS IMPROVED COMPARED TO PROPENSITY MATCHING
+rr1 <- Match(Y = Y1, Tr = Tr, X = X, estimand = "ATT", M = 1, caliper = 0.05,
+             Weight.matrix = genout)
+summary(rr1)
+mb1 <- MatchBalance(datamatch$EV ~ datamatch$age.group + I(datamatch$age.group^2) + I(datamatch$age.group^3) + 
+                      datamatch$age.group:datamatch$educ + datamatch$age.group:datamatch$tech + 
+                      datamatch$educ + I(datamatch$educ^2) + datamatch$tech + I(datamatch$tech^2) + 
+                      datamatch$pol.info + datamatch$educ:datamatch$pol.info + datamatch$age.group:datamatch$pol.info + 
+                      datamatch$tech:datamatch$pol.info + datamatch$white.collar + datamatch$not.full.time + 
+                      datamatch$male, match.out = rr1, nboots = 500)
+#repeat for Y2 - Y9
+
+#GenMatch with MatchIt
+m.outT <- matchit(EV ~ age.group + I(age.group^2) + I(age.group^3) + age.group:educ + 
+                    age.group:tech + educ + I(educ^2) + tech + I(tech^2) + pol.info + 
+                    educ:pol.info + age.group:pol.info + tech:pol.info + white.collar + 
+                    not.full.time + male, caliper = 0.05, data = datamatch, 
+                  method = "genetic", pop.size = 30, max.generations = 10, wait.generations = 1,
+                  estimand = "ATT")
+summary(m.outT)
+plot(m.outT)
+plot(m.outT, type = "hist")
+plot(m.outT, type = "jitter")
+
+#POST-MATCHING TABLE WITH GENMATCH
+datamatchedGM <-match.data(m.outT)
+outcomes.postGM <- datamatchedGM[10:18]
+
+tab3.postGM <- matrix(NA, nrow = n.outcomes, ncol = 5)
+rownames(tab3.postGM) <- outcomes.lbls
+colnames(tab3.postGM) <- c("N", "prop.ev", "prop.tv", "diff", "pvalue")
+
+for (i in 1:n.outcomes) {
+  tab3.postGM[i, 1] <- length(na.omit(outcomes.postGM[, i]))
+  tab3.postGM[i, 2:3] <- rev(prop.table(table(outcomes.postGM[, i], datamatchedGM$EV), 2)[2, ]) * 100
+  tab3.postGM[i, 4] <- tab3.postGM[i, 2] - tab3.postGM[i, 3]	
+  tab3.postGM[i, 5] <- prop.test(table(outcomes.postGM[, i], datamatchedGM$EV)[2, ], n = 
+                                   apply(table(outcomes.postGM[, i], datamatchedGM$EV), 2, sum))$p.value
+}
+
+tab3GM <- cbind(tab3.pre, tab3.postGM)
+
+tab3GM <- tab3GM[rev(order(tab3GM[, 9])), ]
+print(tab3GM, digits = 4)
