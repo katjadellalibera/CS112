@@ -65,12 +65,10 @@ plot(m.out, type = "jitter")
 # matched sample
 
 datamatched <- match.data(m.out)
-datamatched[datamatched == 99999] <- NA #dont run this before table 3, but run before table 4
-
-#save(datamatched, file = "datamatched.Rdata") #dont need this
 
 outcomes.post <- datamatched[10:18]
 
+#Post-matching table for Propensity Score Matching (original)
 tab3.post <- matrix(NA, nrow = n.outcomes, ncol = 5)
 rownames(tab3.post) <- outcomes.lbls
 colnames(tab3.post) <- c("N", "prop.ev", "prop.tv", "diff", "pvalue")
@@ -90,7 +88,11 @@ tab3 <- tab3[rev(order(tab3[, 9])), ]
 
 print(tab3, digits = 4)
 
-################## REPLICATION: GENETIC MATCHING #####################################################
+################## EXTENSION: GENETIC MATCHING #####################################################
+#We argue that propensity score matching (as above) uses nearest neighbor algorithm
+#a greedy algorithm that may give worse balance if the distance are far
+#Hopefully, genetic matching will improve the balance results
+
 print("Matching")
 set.seed(36466)
 X = cbind(datamatch$age.group, datamatch$age.group * datamatch$age.group, 
@@ -123,6 +125,7 @@ mb <- MatchBalance(datamatch$EV ~ datamatch$age.group + I(datamatch$age.group^2)
                      datamatch$tech:datamatch$pol.info + datamatch$white.collar + datamatch$not.full.time + 
                      datamatch$male, match.out = rr, nboots = 500)
 #BALANCE IS IMPROVED COMPARED TO PROPENSITY MATCHING
+
 rr1 <- Match(Y = Y1, Tr = Tr, X = X, estimand = "ATT", M = 1, caliper = 0.05,
              Weight.matrix = genout)
 summary(rr1)
@@ -132,9 +135,9 @@ mb1 <- MatchBalance(datamatch$EV ~ datamatch$age.group + I(datamatch$age.group^2
                       datamatch$pol.info + datamatch$educ:datamatch$pol.info + datamatch$age.group:datamatch$pol.info + 
                       datamatch$tech:datamatch$pol.info + datamatch$white.collar + datamatch$not.full.time + 
                       datamatch$male, match.out = rr1, nboots = 500)
-#repeat for Y2 - Y9
+#repeat for Y2 - Y9, to double check the match balance
 
-#GenMatch with MatchIt
+#GenMatch with MatchIt (to create the table)
 m.outT <- matchit(EV ~ age.group + I(age.group^2) + I(age.group^3) + age.group:educ + 
                     age.group:tech + educ + I(educ^2) + tech + I(tech^2) + pol.info + 
                     educ:pol.info + age.group:pol.info + tech:pol.info + white.collar + 
@@ -145,6 +148,7 @@ summary(m.outT)
 plot(m.outT)
 plot(m.outT, type = "hist")
 plot(m.outT, type = "jitter")
+#This summary allows us to compare the match balance with the previous m.out from the original study
 
 #POST-MATCHING TABLE WITH GENMATCH
 datamatchedGM <-match.data(m.outT)
